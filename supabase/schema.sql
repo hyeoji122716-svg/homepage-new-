@@ -22,3 +22,19 @@ create index if not exists inquiries_created_at_idx
 -- RLS 활성화. 정책을 만들지 않으므로 anon/authenticated 키로는 접근 불가.
 -- 서버에서 service_role 키를 쓰는 경우에만 RLS를 우회하여 읽고/쓴다.
 alter table public.inquiries enable row level security;
+
+
+-- 배치(cron) 실행 결과 로그
+create table if not exists public.cron_logs (
+  id       uuid primary key default gen_random_uuid(),
+  ran_at   timestamptz not null default now(),
+  job      text not null,
+  status   text not null check (status in ('success', 'error')),
+  affected integer,
+  detail   text
+);
+
+create index if not exists cron_logs_ran_at_idx
+  on public.cron_logs (ran_at desc);
+
+alter table public.cron_logs enable row level security;

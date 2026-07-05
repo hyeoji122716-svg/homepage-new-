@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
+import { RETENTION_YEARS } from "@/lib/config";
 
 export const metadata: Metadata = {
   title: "개인정보처리방침 | 커넥트유",
@@ -15,7 +16,7 @@ const COMPANY = {
   address: "인천광역시 영종구 영종대로162번길 20, 305호 D-62(운서동)",
   managerName: "남궁혜지",
   managerContact: "connectu_team@naver.com / 010-3207-5251",
-  retentionYears: 3,
+  retentionYears: RETENTION_YEARS,
   // 시행일 = 이 방침을 실제로 적용(홈페이지 오픈)하는 날. 오픈일에 맞춰 수정하세요.
   effectiveDate: "2026-07-05",
 };
