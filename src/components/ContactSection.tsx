@@ -38,12 +38,38 @@ export default function ContactSection() {
     type: "",
     message: "",
   });
+  const [consent, setConsent] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 추후 실제 전송 연동
-    setSubmitted(true);
+    if (!consent) {
+      setError("개인정보 수집·이용에 동의해주세요.");
+      return;
+    }
+    setError("");
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/inquiries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, consent }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "전송에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+      setSubmitted(true);
+      setForm({ name: "", org: "", email: "", phone: "", type: "", message: "" });
+      setConsent(false);
+    } catch {
+      setError("네트워크 오류가 발생했습니다. 연결을 확인해주세요.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -131,9 +157,10 @@ export default function ContactSection() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-400 mb-1.5">소속 기관 / 기업</label>
+                    <label className="block text-sm text-gray-400 mb-1.5">소속 기관 / 기업 *</label>
                     <input
                       type="text"
+                      required
                       value={form.org}
                       onChange={(e) => setForm({ ...form, org: e.target.value })}
                       className="w-full bg-gray-800 border border-gray-700 focus:border-[#b1ff57] rounded-xl px-4 py-3 text-white placeholder-gray-600 outline-none transition-colors text-sm"
@@ -166,8 +193,9 @@ export default function ContactSection() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">문의 유형</label>
+                  <label className="block text-sm text-gray-400 mb-1.5">문의 유형 *</label>
                   <select
+                    required
                     value={form.type}
                     onChange={(e) => setForm({ ...form, type: e.target.value })}
                     className="w-full bg-gray-800 border border-gray-700 focus:border-[#b1ff57] rounded-xl px-4 py-3 text-white outline-none transition-colors text-sm appearance-none"
@@ -192,11 +220,40 @@ export default function ContactSection() {
                   />
                 </div>
 
+                <label className="flex items-start gap-2.5 cursor-pointer select-none pt-1">
+                  <input
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 accent-[#b1ff57] shrink-0"
+                  />
+                  <span className="text-xs text-gray-500 leading-relaxed">
+                    <span className="text-gray-300">개인정보 수집·이용 동의 (필수)</span>
+                    <br />
+                    문의 응대를 위해 이름·소속·이메일·연락처·문의 내용을 수집하며,
+                    처리 완료 후 3년간 보관 뒤 파기합니다. 동의를 거부할 수 있으나
+                    이 경우 문의 접수가 제한됩니다.{" "}
+                    <a
+                      href="/privacy"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#b1ff57] underline hover:no-underline"
+                    >
+                      개인정보처리방침 전문 보기
+                    </a>
+                  </span>
+                </label>
+
+                {error && (
+                  <p className="text-red-400 text-sm">{error}</p>
+                )}
+
                 <button
                   type="submit"
-                  className="w-full py-4 bg-[#b1ff57] hover:bg-[#9ce040] text-gray-900 font-semibold rounded-xl transition-all hover:scale-[1.02] shadow-lg shadow-[#b1ff57]/20"
+                  disabled={submitting}
+                  className="w-full py-4 bg-[#b1ff57] hover:bg-[#9ce040] disabled:opacity-60 disabled:hover:scale-100 text-gray-900 font-semibold rounded-xl transition-all hover:scale-[1.02] shadow-lg shadow-[#b1ff57]/20"
                 >
-                  문의 보내기
+                  {submitting ? "전송 중..." : "문의 보내기"}
                 </button>
               </form>
             )}
