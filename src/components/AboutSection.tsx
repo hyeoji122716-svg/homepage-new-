@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const careers = [
   {
     type: "현재",
@@ -60,17 +62,16 @@ export default function AboutSection() {
 
         {/* 프로필 카드 */}
         <div className="grid md:grid-cols-2 gap-12 mb-20 items-center">
-          {/* 프로필 이미지 자리 */}
+          {/* 프로필 이미지 */}
           <div className="relative aspect-[3/4] max-w-sm mx-auto w-full">
-            <div className="w-full h-full bg-gray-100 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-gray-300">
-              <span className="text-5xl mb-4">📸</span>
-              <p className="text-gray-400 text-sm text-center px-6 leading-relaxed">
-                [프로필 사진]<br />
-                강사의 전문적인 프로필 사진.<br />
-                밝은 배경 또는 스튜디오 촬영본.<br />
-                권장 비율: 3:4 세로형
-              </p>
-            </div>
+            <Image
+              src="/profile.jpg"
+              alt="남궁혜지 강사 프로필 사진"
+              fill
+              sizes="(max-width: 768px) 100vw, 384px"
+              className="object-cover rounded-2xl"
+              priority
+            />
             {/* 경력 뱃지 */}
             <div className="absolute -bottom-4 -right-4 bg-[#b1ff57] text-gray-900 rounded-2xl px-5 py-3 shadow-lg">
               <div className="text-2xl font-bold">8년+</div>
