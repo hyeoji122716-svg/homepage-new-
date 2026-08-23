@@ -38,3 +38,61 @@ create index if not exists cron_logs_ran_at_idx
   on public.cron_logs (ran_at desc);
 
 alter table public.cron_logs enable row level security;
+
+
+-- ---------------------------------------------------------------------------
+-- bookings : 컨설팅 예약 신청 건
+--   · 예약 가능 슬롯(날짜/시간)은 코드에 하드코딩되어 있고(별도 slots 테이블 없음),
+--     예약된 건만 이 테이블에 저장한다.
+--   · 모든 시각은 Asia/Seoul 기준 "벽시계 시간". slot_date(date) + start_time(time)로
+--     분리 저장하고 UTC 변환하지 않는다. (created_at 등 감사 컬럼만 timestamptz)
+--   · 슬롯은 1시간 단위(정각)만 허용한다.
+-- ---------------------------------------------------------------------------
+create table if not exists public.bookings (
+  id            uuid        primary key default gen_random_uuid(),
+  slot_date     date        not null,
+  start_time    time        not null,
+
+  company_name  text        not null,
+  contact_name  text        not null,
+  phone         text        not null,
+  email         text        not null,
+
+  -- '60' = 60분, '30' = 30분 (30분도 1시간 슬롯을 점유한다)
+  consult_type  text        not null default '60'
+                            check (consult_type in ('60', '30')),
+
+  sns_url       text,
+  pre_question  text,
+
+  -- 취소/조회용 랜덤 토큰 (uuid 2개 이어붙인 hex). gen_random_uuid()는 코어 함수.
+  cancel_token  text        not null unique
+                            default replace(gen_random_uuid()::text, '-', '')
+                                 || replace(gen_random_uuid()::text, '-', ''),
+
+  created_at    timestamptz not null default now(),
+  -- null 이면 유효 예약, 값이 있으면 취소된 예약
+  cancelled_at  timestamptz,
+
+  -- 슬롯은 1시간 단위(정각)만
+  constraint bookings_start_time_hourly check (
+    extract(minute from start_time) = 0
+    and extract(second from start_time) = 0
+  )
+);
+
+-- 이중 예약 방지: DB 레벨에서 막는 "최종 권위". 절대 제거하지 말 것.
+-- 취소되지 않은(cancelled_at is null) 예약만 대상으로 (날짜, 시각) 유니크.
+-- 취소하면 해당 슬롯은 자동으로 다시 예약 가능해진다.
+create unique index if not exists bookings_active_slot_unique
+  on public.bookings (slot_date, start_time)
+  where cancelled_at is null;
+
+create index if not exists bookings_cancel_token_idx
+  on public.bookings (cancel_token);
+
+create index if not exists bookings_created_at_idx
+  on public.bookings (created_at desc);
+
+-- 모든 접근은 서버에서 service_role 키로만. anon 키로는 직접 못 읽게 RLS 켜둔다.
+alter table public.bookings enable row level security;

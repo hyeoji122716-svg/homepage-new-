@@ -92,3 +92,80 @@ function escapeHtml(s: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+
+export interface BookingMail {
+  company_name: string;
+  contact_name: string;
+  phone: string;
+  email: string;
+  consult_type: "60" | "30";
+  sns_url: string | null;
+  pre_question: string | null;
+  slot_date: string; // 'YYYY-MM-DD'
+  time_label: string; // '01:00 ~ 02:00'
+}
+
+/**
+ * 예약 접수 시 관리자에게 알림 메일 발송.
+ * 문의 알림과 동일하게, 메일 설정이 없거나 실패해도 예외를 던지지 않는다.
+ * (예약 저장 자체는 유지)
+ *
+ * 제목: `{기업명} 예약 접수 {예약일시}`
+ */
+export async function sendBookingNotification(booking: BookingMail): Promise<void> {
+  const to = process.env.INQUIRY_NOTIFY_TO;
+  const t = getTransporter();
+
+  if (!t || !to) {
+    console.warn(
+      "예약 알림 메일 건너뜀: GMAIL_USER / GMAIL_APP_PASSWORD / INQUIRY_NOTIFY_TO 환경변수를 확인하세요."
+    );
+    return;
+  }
+
+  const dateTime = `${booking.slot_date} ${booking.time_label}`;
+  const typeLabel = booking.consult_type === "30" ? "30분" : "60분";
+
+  const rows: [string, string][] = [
+    ["예약 일시", dateTime],
+    ["상담 유형", typeLabel],
+    ["기업명", booking.company_name],
+    ["담당자", booking.contact_name],
+    ["연락처", booking.phone],
+    ["이메일", booking.email],
+    ["SNS", booking.sns_url || "-"],
+  ];
+
+  const textBody =
+    rows.map(([k, v]) => `${k}: ${v}`).join("\n") +
+    `\n\n[사전 질문·고민]\n${booking.pre_question || "-"}`;
+
+  const htmlBody = `
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#222">
+      <h2 style="margin:0 0 16px">새 예약이 접수되었습니다</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        ${rows
+          .map(
+            ([k, v]) =>
+              `<tr>
+                 <td style="padding:8px 12px;background:#f5f5f5;font-weight:600;width:96px;border:1px solid #eee">${k}</td>
+                 <td style="padding:8px 12px;border:1px solid #eee">${escapeHtml(v)}</td>
+               </tr>`
+          )
+          .join("")}
+      </table>
+      <div style="margin-top:16px;padding:14px;background:#fafafa;border:1px solid #eee;border-radius:8px;white-space:pre-wrap;font-size:14px;line-height:1.6">${escapeHtml(
+        booking.pre_question || "-"
+      )}</div>
+    </div>`;
+
+  const info = await t.sendMail({
+    from: `"커넥트유 예약 알림" <${process.env.GMAIL_USER}>`,
+    to,
+    replyTo: booking.email,
+    subject: `${booking.company_name} 예약 접수 ${dateTime}`,
+    text: textBody,
+    html: htmlBody,
+  });
+  console.log(`예약 알림 메일 발송 성공 → ${to} (messageId: ${info.messageId})`);
+}

@@ -25,3 +25,22 @@ export const STATUS_LABELS: Record<InquiryStatus, string> = {
   in_progress: "처리중",
   done: "완료",
 };
+
+// ── 예약(bookings) ─────────────────────────────────────────
+export type ConsultType = "60" | "30";
+
+export interface Booking {
+  id: string;
+  slot_date: string; // 'YYYY-MM-DD' (Asia/Seoul 기준 날짜)
+  start_time: string; // 'HH:MM:SS' (Asia/Seoul 기준 시각, 정각)
+  company_name: string;
+  contact_name: string;
+  phone: string;
+  email: string;
+  consult_type: ConsultType;
+  sns_url: string | null;
+  pre_question: string | null;
+  cancel_token: string;
+  created_at: string;
+  cancelled_at: string | null; // null 이면 유효 예약
+}
