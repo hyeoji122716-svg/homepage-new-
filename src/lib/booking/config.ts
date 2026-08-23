@@ -19,15 +19,32 @@ export const BOOKING_MONTHS: { year: number; month: number }[] = [
  * 사업명 목록. 신청 폼의 셀렉트 값이자, 이 중 하나만 허용한다(서버 검증).
  * 관리자 화면에서 이 값으로 필터링한다.
  */
+/** 상담 유형이 30분으로 고정(변경 불가)되는 사업 */
+export const FIXED_30_PROJECT = "서울시 소상공인 온라인 판로개척 지원사업";
+
 export const PROJECTS: string[] = [
   "[전남기업]무역협회 큐텐쇼츠사업",
   "[광주기업]무역협회 큐텐쇼츠사업",
-  "서울시 소상공인 온라인 판로개척 지원사업",
+  FIXED_30_PROJECT,
 ];
 
 /** 유효한 사업명인지 */
 export function isValidProject(name: string): boolean {
   return PROJECTS.includes(name);
+}
+
+/** 이 사업은 상담 유형이 30분으로 고정된다 */
+export function isFixed30Project(name: string): boolean {
+  return name === FIXED_30_PROJECT;
+}
+
+/**
+ * 사업명으로 상담 유형이 자동 결정된다(사용자 선택 없음).
+ * - 서울시 사업: 30분 고정
+ * - 그 외(전남/광주): 60분 고정
+ */
+export function consultTypeForProject(name: string): "60" | "30" {
+  return isFixed30Project(name) ? "30" : "60";
 }
 
 /**

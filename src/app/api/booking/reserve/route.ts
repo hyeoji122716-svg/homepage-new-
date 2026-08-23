@@ -2,9 +2,14 @@ import type { NextRequest } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { requireBookingAccess } from "@/lib/booking/access";
-import { isOpenSlot, isValidProject, slotLabel, toDbTime } from "@/lib/booking/config";
+import {
+  consultTypeForProject,
+  isOpenSlot,
+  isValidProject,
+  slotLabel,
+  toDbTime,
+} from "@/lib/booking/config";
 import { sendBookingNotification } from "@/lib/mail";
-import type { ConsultType } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +34,6 @@ export async function POST(request: NextRequest) {
   const contactName = String(body.contact_name ?? "").trim();
   const phone = String(body.phone ?? "").trim();
   const email = String(body.email ?? "").trim();
-  const consultRaw = String(body.consult_type ?? "60").trim();
   const snsUrl = String(body.sns_url ?? "").trim() || null;
   const preQuestion = String(body.pre_question ?? "").trim() || null;
 
@@ -59,13 +63,8 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
-  if (consultRaw !== "60" && consultRaw !== "30") {
-    return Response.json(
-      { error: "상담 유형이 올바르지 않습니다." },
-      { status: 400 }
-    );
-  }
-  const consultType = consultRaw as ConsultType;
+  // 상담 유형은 사업명으로 자동 결정한다(클라이언트 값 무시).
+  const consultType = consultTypeForProject(projectName);
 
   if (
     companyName.length > 200 ||

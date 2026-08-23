@@ -9,7 +9,7 @@ import {
   weekdayOf,
 } from "@/lib/booking/calendar";
 import { formatDateWithWeekday } from "@/lib/booking/format";
-import { PROJECTS } from "@/lib/booking/config";
+import { PROJECTS, consultTypeForProject } from "@/lib/booking/config";
 
 const BRAND = "#1B4FD8";
 const POINT = "#FF6B5A";
@@ -339,7 +339,6 @@ function BookingForm({
   const [contactName, setContactName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
-  const [consultType, setConsultType] = useState<"60" | "30">("60");
   const [snsUrl, setSnsUrl] = useState("");
   const [preQuestion, setPreQuestion] = useState("");
   const [pending, setPending] = useState(false);
@@ -361,7 +360,6 @@ function BookingForm({
           contact_name: contactName,
           phone,
           email,
-          consult_type: consultType,
           sns_url: snsUrl,
           pre_question: preQuestion,
         }),
@@ -435,23 +433,14 @@ function BookingForm({
           <input className={inputCls} value={email} onChange={(e) => setEmail(e.target.value)} type="email" required />
         </Field>
 
-        <Field label="상담 유형" required>
-          <div className="flex gap-2">
-            {(["60", "30"] as const).map((t) => (
-              <button
-                type="button"
-                key={t}
-                onClick={() => setConsultType(t)}
-                className="flex-1 rounded-xl border px-4 py-2.5 text-[15px] font-semibold"
-                style={
-                  consultType === t
-                    ? { borderColor: BRAND, background: BRAND, color: "white" }
-                    : { borderColor: "#d1d5db", color: "#555", background: "white" }
-                }
-              >
-                {t}분
-              </button>
-            ))}
+        <Field label="상담 유형">
+          <div
+            className="rounded-xl border px-4 py-2.5 text-[15px] font-semibold"
+            style={{ borderColor: "#e5e7eb", background: "#f6f7f9", color: "#555" }}
+          >
+            {projectName
+              ? `${consultTypeForProject(projectName)}분 (사업명에 따라 자동 지정)`
+              : "사업명을 선택하면 자동으로 정해집니다"}
           </div>
         </Field>
 
