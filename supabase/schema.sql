@@ -53,6 +53,9 @@ create table if not exists public.bookings (
   slot_date     date        not null,
   start_time    time        not null,
 
+  -- 사업명 (신청 폼에서 택1). 허용 값은 앱(config.ts PROJECTS)에서 검증한다.
+  project_name  text        not null,
+
   company_name  text        not null,
   contact_name  text        not null,
   phone         text        not null,
@@ -96,3 +99,7 @@ create index if not exists bookings_created_at_idx
 
 -- 모든 접근은 서버에서 service_role 키로만. anon 키로는 직접 못 읽게 RLS 켜둔다.
 alter table public.bookings enable row level security;
+
+-- 기존 bookings 테이블에 사업명 컬럼 추가 (여러 번 실행해도 안전).
+-- 새로 만드는 경우 위 create table 에 이미 포함되어 있다.
+alter table public.bookings add column if not exists project_name text;

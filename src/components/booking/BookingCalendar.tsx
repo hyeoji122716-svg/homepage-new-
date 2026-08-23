@@ -9,6 +9,7 @@ import {
   weekdayOf,
 } from "@/lib/booking/calendar";
 import { formatDateWithWeekday } from "@/lib/booking/format";
+import { PROJECTS } from "@/lib/booking/config";
 
 const BRAND = "#1B4FD8";
 const POINT = "#FF6B5A";
@@ -28,6 +29,7 @@ type DoneInfo = { slot_date: string; time_label: string; cancel_token: string };
 
 export default function BookingCalendar({ token }: { token: string }) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
+  const [monthIndex, setMonthIndex] = useState(0); // 0 = 첫 번째 달(기본 9월)
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [activeSlot, setActiveSlot] = useState<SlotInfo | null>(null);
   const [done, setDone] = useState<DoneInfo | null>(null);
@@ -156,22 +158,47 @@ export default function BookingCalendar({ token }: { token: string }) {
             골라 예약해 주세요.
           </p>
 
-          <div className="space-y-8">
-            {availability.months.map(({ year, month }) => (
-              <MonthCalendar
-                key={`${year}-${month}`}
-                year={year}
-                month={month}
-                openDateSet={openDateSet}
-                dates={availability.dates}
-                selectedDate={selectedDate}
-                onSelect={(date) => {
-                  setSelectedDate(date);
-                  setActiveSlot(null);
-                }}
-              />
-            ))}
-          </div>
+          {(() => {
+            const months = availability.months;
+            const safeIndex = Math.min(monthIndex, months.length - 1);
+            const current = months[safeIndex];
+            return (
+              <div>
+                <div className="mb-3 flex items-center justify-between">
+                  <ArrowButton
+                    dir="prev"
+                    disabled={safeIndex === 0}
+                    onClick={() => {
+                      setMonthIndex(safeIndex - 1);
+                      setSelectedDate(null);
+                    }}
+                  />
+                  <h3 className="text-lg font-bold" style={{ color: BRAND }}>
+                    {monthTitle(current.year, current.month)}
+                  </h3>
+                  <ArrowButton
+                    dir="next"
+                    disabled={safeIndex === months.length - 1}
+                    onClick={() => {
+                      setMonthIndex(safeIndex + 1);
+                      setSelectedDate(null);
+                    }}
+                  />
+                </div>
+                <MonthCalendar
+                  year={current.year}
+                  month={current.month}
+                  openDateSet={openDateSet}
+                  dates={availability.dates}
+                  selectedDate={selectedDate}
+                  onSelect={(date) => {
+                    setSelectedDate(date);
+                    setActiveSlot(null);
+                  }}
+                />
+              </div>
+            );
+          })()}
 
           {selectedDate && (
             <div className="mt-8 rounded-2xl border p-5" style={{ borderColor: "#e5e7eb" }}>
@@ -228,9 +255,6 @@ function MonthCalendar({
 
   return (
     <div>
-      <h3 className="mb-3 text-lg font-bold" style={{ color: BRAND }}>
-        {monthTitle(year, month)}
-      </h3>
       <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-gray-400">
         {WEEKDAY_LABELS.map((w, i) => (
           <div key={w} className="py-1" style={{ color: i === 0 ? POINT : undefined }}>
@@ -273,6 +297,29 @@ function MonthCalendar({
   );
 }
 
+function ArrowButton({
+  dir,
+  disabled,
+  onClick,
+}: {
+  dir: "prev" | "next";
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={dir === "prev" ? "이전 달" : "다음 달"}
+      disabled={disabled}
+      onClick={onClick}
+      className="flex h-9 w-9 items-center justify-center rounded-full border text-lg transition-colors disabled:opacity-30"
+      style={{ borderColor: "#d1d5db", color: BRAND }}
+    >
+      {dir === "prev" ? "‹" : "›"}
+    </button>
+  );
+}
+
 // ── 신청 폼 ────────────────────────────────────────────────
 function BookingForm({
   token,
@@ -287,6 +334,7 @@ function BookingForm({
   onCancel: () => void;
   onBooked: (info: DoneInfo) => void;
 }) {
+  const [projectName, setProjectName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [contactName, setContactName] = useState("");
   const [phone, setPhone] = useState("");
@@ -308,6 +356,7 @@ function BookingForm({
         body: JSON.stringify({
           slot_date: slotDate,
           start_time: slot.start,
+          project_name: projectName,
           company_name: companyName,
           contact_name: contactName,
           phone,
@@ -356,6 +405,23 @@ function BookingForm({
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
+        <Field label="사업명" required>
+          <select
+            className={`${inputCls} bg-white`}
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            required
+          >
+            <option value="" disabled>
+              사업명을 선택하세요
+            </option>
+            {PROJECTS.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </Field>
         <Field label="기업명" required>
           <input className={inputCls} value={companyName} onChange={(e) => setCompanyName(e.target.value)} required />
         </Field>

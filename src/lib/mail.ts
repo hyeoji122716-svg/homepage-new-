@@ -94,6 +94,7 @@ function escapeHtml(s: string): string {
 }
 
 export interface BookingMail {
+  project_name: string;
   company_name: string;
   contact_name: string;
   phone: string;
@@ -128,6 +129,7 @@ export async function sendBookingNotification(booking: BookingMail): Promise<voi
 
   const rows: [string, string][] = [
     ["예약 일시", dateTime],
+    ["사업명", booking.project_name],
     ["상담 유형", typeLabel],
     ["기업명", booking.company_name],
     ["담당자", booking.contact_name],

@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { requireBookingAccess } from "@/lib/booking/access";
-import { isOpenSlot, slotLabel, toDbTime } from "@/lib/booking/config";
+import { isOpenSlot, isValidProject, slotLabel, toDbTime } from "@/lib/booking/config";
 import { sendBookingNotification } from "@/lib/mail";
 import type { ConsultType } from "@/lib/types";
 
@@ -24,6 +24,7 @@ export async function POST(request: NextRequest) {
 
   const slotDate = String(body.slot_date ?? "").trim();
   const start = String(body.start_time ?? "").trim(); // 'HH:MM'
+  const projectName = String(body.project_name ?? "").trim();
   const companyName = String(body.company_name ?? "").trim();
   const contactName = String(body.contact_name ?? "").trim();
   const phone = String(body.phone ?? "").trim();
@@ -40,6 +41,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!isValidProject(projectName)) {
+    return Response.json(
+      { error: "사업명을 선택해 주세요." },
+      { status: 400 }
+    );
+  }
   if (!companyName || !contactName || !phone || !email) {
     return Response.json(
       { error: "기업명, 담당자명, 연락처, 이메일은 필수 항목입니다." },
@@ -77,6 +84,7 @@ export async function POST(request: NextRequest) {
       .insert({
         slot_date: slotDate,
         start_time: toDbTime(start),
+        project_name: projectName,
         company_name: companyName,
         contact_name: contactName,
         phone,
@@ -104,6 +112,7 @@ export async function POST(request: NextRequest) {
     // 알림 메일 (실패해도 예약은 유지)
     try {
       await sendBookingNotification({
+        project_name: projectName,
         company_name: companyName,
         contact_name: contactName,
         phone,

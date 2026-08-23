@@ -33,6 +33,7 @@ export interface Booking {
   id: string;
   slot_date: string; // 'YYYY-MM-DD' (Asia/Seoul 기준 날짜)
   start_time: string; // 'HH:MM:SS' (Asia/Seoul 기준 시각, 정각)
+  project_name: string; // 사업명 (PROJECTS 중 하나)
   company_name: string;
   contact_name: string;
   phone: string;

@@ -9,11 +9,26 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-/** 달력에 보여줄 달 (2026년 9월, 10월) */
+/** 달력에 보여줄 달 (2026년 9월, 10월). 기본 노출은 첫 번째(9월). */
 export const BOOKING_MONTHS: { year: number; month: number }[] = [
   { year: 2026, month: 9 },
   { year: 2026, month: 10 },
 ];
+
+/**
+ * 사업명 목록. 신청 폼의 셀렉트 값이자, 이 중 하나만 허용한다(서버 검증).
+ * 관리자 화면에서 이 값으로 필터링한다.
+ */
+export const PROJECTS: string[] = [
+  "[전남기업]무역협회 큐텐쇼츠사업",
+  "[광주기업]무역협회 큐텐쇼츠사업",
+  "서울시 소상공인 온라인 판로개척 지원사업",
+];
+
+/** 유효한 사업명인지 */
+export function isValidProject(name: string): boolean {
+  return PROJECTS.includes(name);
+}
 
 /**
  * 하드코딩으로 열어둔 예약 가능 슬롯.
