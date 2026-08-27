@@ -8,6 +8,17 @@
 - 기존 DB에 적용할 때는 `create table if not exists` / `add column if not exists` 처럼 **여러 번 실행해도 안전한(idempotent)** 형태로 제공한다.
 - DDL은 복사해서 바로 실행할 수 있게 ```sql 코드블록으로 제시한다.
 
+### 파일 분리 규칙
+
+| 파일 | 담는 것 |
+| --- | --- |
+| `supabase/schema.sql` | 테이블 · 인덱스 · 제약조건 · RLS (신규 프로젝트용 전체 스키마) |
+| `supabase/functions.sql` | Postgres 함수(`create or replace function`) 전용. **함수를 schema.sql 에 넣지 말 것.** |
+| `supabase/seed-*.sql` | 데이터 등록(슬롯 등)처럼 1회성 insert |
+
+실행 순서는 `schema.sql` → `functions.sql` → `seed-*.sql` 이고, 안내할 때도 이 순서를 명시한다.
+세 파일 모두 여러 번 실행해도 안전해야 한다.
+
 ## 🎨 중요 안내 강조 규칙
 
 사용자가 놓치면 안 되는 중요한 내용(아래 예시) 옆에는 **눈에 띄는 알록달록한 이모지**를 붙여 강조한다.

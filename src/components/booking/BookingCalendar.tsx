@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   WEEKDAY_LABELS,
@@ -8,17 +8,16 @@ import {
   monthTitle,
   weekdayOf,
 } from "@/lib/booking/calendar";
-import { formatDateWithWeekday } from "@/lib/booking/format";
+import {
+  formatDateWithWeekday,
+  formatMonthDay,
+  formatMonthDayWithWeekday,
+} from "@/lib/booking/format";
 import { PROJECTS, consultTypeForProject } from "@/lib/booking/config";
+import type { Availability, DayAvailability, SlotInfo } from "@/lib/types";
 
 const BRAND = "#1B4FD8";
 const POINT = "#FF6B5A";
-
-type SlotInfo = { start: string; end: string; label: string; booked: boolean };
-type Availability = {
-  months: { year: number; month: number }[];
-  dates: Record<string, SlotInfo[]>;
-};
 
 type LoadState =
   | { kind: "loading" }
@@ -33,6 +32,9 @@ export default function BookingCalendar({ token }: { token: string }) {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [activeSlot, setActiveSlot] = useState<SlotInfo | null>(null);
   const [done, setDone] = useState<DoneInfo | null>(null);
+  // 신청 도중 그 날짜가 마감된 경우 달력 위에 띄우는 안내
+  const [notice, setNotice] = useState<string | null>(null);
+  const openDatesRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -62,20 +64,62 @@ export default function BookingCalendar({ token }: { token: string }) {
 
   const availability = state.kind === "ok" ? state.data : null;
 
-  const slotsForSelected = useMemo<SlotInfo[]>(() => {
-    if (!availability || !selectedDate) return [];
-    return availability.dates[selectedDate] ?? [];
+  const selectedDay = useMemo<DayAvailability | null>(() => {
+    if (!availability || !selectedDate) return null;
+    return availability.dates[selectedDate] ?? null;
   }, [availability, selectedDate]);
 
   const openDateSet = useMemo(() => {
     const s = new Set<string>();
     if (availability) {
-      for (const [date, slots] of Object.entries(availability.dates)) {
-        if (slots.length > 0) s.add(date);
+      for (const [date, day] of Object.entries(availability.dates)) {
+        if (day.slots.length > 0) s.add(date);
       }
     }
     return s;
   }, [availability]);
+
+  /** 아직 고를 수 있는 날짜 (하루 상한에 걸리지 않았고 빈 슬롯이 있는 날) */
+  const openDates = useMemo(() => {
+    if (!availability) return [];
+    return Object.entries(availability.dates)
+      .filter(([, day]) => !day.full && day.slots.some((slot) => !slot.booked))
+      .map(([date]) => date)
+      .sort();
+  }, [availability]);
+
+  /** 날짜 선택 (다른 달의 날짜를 고르면 달력도 그 달로 넘긴다) */
+  const selectDate = useCallback(
+    (date: string) => {
+      const idx =
+        availability?.months.findIndex(
+          (m) =>
+            m.year === Number(date.slice(0, 4)) &&
+            m.month === Number(date.slice(5, 7))
+        ) ?? -1;
+      if (idx >= 0) setMonthIndex(idx);
+      setSelectedDate(date);
+      setActiveSlot(null);
+      setNotice(null);
+    },
+    [availability]
+  );
+
+  /**
+   * 신청 폼을 채우는 사이에 그 날짜가 하루 상한에 도달한 경우.
+   * 폼을 닫고 달력으로 돌아가서, 아직 고를 수 있는 날짜 목록으로 스크롤한다.
+   */
+  function handleDayFull(message: string) {
+    setActiveSlot(null);
+    setNotice(message);
+    load().then((result) => setState(result));
+  }
+
+  // 안내가 새로 뜨면 예약 가능한 날짜 목록으로 데려간다.
+  useEffect(() => {
+    if (!notice) return;
+    openDatesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [notice]);
 
   function handleBooked(info: DoneInfo) {
     setDone(info);
@@ -109,6 +153,25 @@ export default function BookingCalendar({ token }: { token: string }) {
           <p className="mt-4 text-sm text-gray-500">
             담당자가 확인 후 안내드립니다. 창을 닫으셔도 됩니다.
           </p>
+
+          {/* 조회 전용 링크. 이 주소로 예약 내용을 다시 확인할 수 있다.
+              변경·취소는 이 페이지에 안내된 담당자 연락처로 받는다. */}
+          <div className="mt-5 rounded-xl bg-gray-50 px-4 py-3.5 text-left">
+            <p className="text-sm font-semibold text-gray-600">
+              예약 확인 주소 (저장해 두세요)
+            </p>
+            <a
+              href={`/booking/${done.cancel_token}`}
+              className="mt-1.5 block break-all text-sm underline"
+              style={{ color: BRAND }}
+            >
+              {`/booking/${done.cancel_token}`}
+            </a>
+            <p className="mt-2 text-[13px] leading-relaxed text-gray-500">
+              예약 변경·취소는 이 페이지에 안내된 연락처로 알려주세요.
+            </p>
+          </div>
+
           <button
             onClick={() => {
               setDone(null);
@@ -134,6 +197,7 @@ export default function BookingCalendar({ token }: { token: string }) {
           slot={activeSlot}
           onCancel={() => setActiveSlot(null)}
           onBooked={handleBooked}
+          onDayFull={handleDayFull}
         />
       </Shell>
     );
@@ -153,10 +217,26 @@ export default function BookingCalendar({ token }: { token: string }) {
 
       {availability && (
         <>
-          <p className="mb-6 text-[15px] leading-relaxed text-gray-600">
+          <p className="mb-3 text-[15px] leading-relaxed text-gray-600">
             원하시는 <b style={{ color: BRAND }}>날짜</b>를 먼저 선택한 뒤, 시간대를
             골라 예약해 주세요.
           </p>
+
+          <p
+            className="mb-6 rounded-xl px-4 py-2.5 text-[13px] leading-relaxed"
+            style={{ background: "#EAF0FF", color: BRAND }}
+          >
+            컨설팅 품질을 위해 하루 예약 건수를 제한하고 있습니다.
+          </p>
+
+          {notice && (
+            <p
+              className="mb-6 rounded-xl px-4 py-3 text-sm font-semibold leading-relaxed"
+              style={{ background: "#FFF0EE", color: POINT }}
+            >
+              {notice}
+            </p>
+          )}
 
           {(() => {
             const months = availability.months;
@@ -191,44 +271,96 @@ export default function BookingCalendar({ token }: { token: string }) {
                   openDateSet={openDateSet}
                   dates={availability.dates}
                   selectedDate={selectedDate}
-                  onSelect={(date) => {
-                    setSelectedDate(date);
-                    setActiveSlot(null);
-                  }}
+                  onSelect={selectDate}
                 />
               </div>
             );
           })()}
 
-          {selectedDate && (
-            <div className="mt-8 rounded-2xl border p-5" style={{ borderColor: "#e5e7eb" }}>
-              <h3 className="text-base font-bold text-gray-800">
-                {formatDateWithWeekday(selectedDate)} 시간 선택
-              </h3>
-              {slotsForSelected.length === 0 ? (
-                <p className="mt-3 text-sm text-gray-500">예약 가능한 시간이 없습니다.</p>
-              ) : (
-                <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                  {slotsForSelected.map((slot) => (
-                    <button
-                      key={slot.start}
-                      disabled={slot.booked}
-                      onClick={() => setActiveSlot(slot)}
-                      className="flex items-center justify-between rounded-xl border px-4 py-3 text-left text-[15px] transition-colors disabled:cursor-not-allowed"
-                      style={
-                        slot.booked
-                          ? { borderColor: "#eee", background: "#f6f6f6", color: "#aaa" }
-                          : { borderColor: BRAND, color: BRAND, background: "white" }
-                      }
-                    >
-                      <span className="font-semibold">{slot.label}</span>
-                      <span className="text-sm">{slot.booked ? "마감" : "예약"}</span>
-                    </button>
-                  ))}
+          {/* 아직 고를 수 있는 날짜. 신청 중 마감된 경우 여기로 스크롤한다. */}
+          <div ref={openDatesRef} className="mt-6">
+            <p className="mb-2 text-sm font-semibold text-gray-500">
+              예약 가능한 날짜
+            </p>
+            {openDates.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                지금은 예약 가능한 날짜가 없습니다.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {openDates.map((date) => (
+                  <button
+                    key={date}
+                    onClick={() => selectDate(date)}
+                    className="rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors"
+                    style={
+                      date === selectedDate
+                        ? { borderColor: BRAND, background: BRAND, color: "white" }
+                        : { borderColor: BRAND, color: BRAND, background: "white" }
+                    }
+                  >
+                    {formatMonthDayWithWeekday(date)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {selectedDate &&
+            selectedDay &&
+            /* 하루 상한이 찬 날은 시간대를 하나씩 보여주지 않고 카드째 접는다. */
+            (selectedDay.full ? (
+              <div
+                className="mt-6 rounded-2xl border p-5 text-center"
+                style={{ borderColor: "#eee", background: "#fafafa" }}
+              >
+                <span
+                  className="inline-block rounded-full px-4 py-2 text-sm font-bold"
+                  style={{ background: "#FFF0EE", color: POINT }}
+                >
+                  {formatMonthDay(selectedDate)} · 예약 마감
+                </span>
+              </div>
+            ) : (
+              <div
+                className="mt-6 rounded-2xl border p-5"
+                style={{ borderColor: "#e5e7eb" }}
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="text-base font-bold text-gray-800">
+                    {formatDateWithWeekday(selectedDate)} 시간 선택
+                  </h3>
+                  <span className="text-sm text-gray-500">
+                    예약 {selectedDay.booked}/{selectedDay.limit}
+                  </span>
                 </div>
-              )}
-            </div>
-          )}
+
+                {selectedDay.slots.length === 0 ? (
+                  <p className="mt-3 text-sm text-gray-500">
+                    예약 가능한 시간이 없습니다.
+                  </p>
+                ) : (
+                  <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    {selectedDay.slots.map((slot) => (
+                      <button
+                        key={slot.start}
+                        disabled={slot.booked}
+                        onClick={() => setActiveSlot(slot)}
+                        className="flex items-center justify-between rounded-xl border px-4 py-3 text-left text-[15px] transition-colors disabled:cursor-not-allowed"
+                        style={
+                          slot.booked
+                            ? { borderColor: "#eee", background: "#f6f6f6", color: "#aaa" }
+                            : { borderColor: BRAND, color: BRAND, background: "white" }
+                        }
+                      >
+                        <span className="font-semibold">{slot.label}</span>
+                        <span className="text-sm">{slot.booked ? "마감" : "예약"}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
         </>
       )}
     </Shell>
@@ -247,7 +379,7 @@ function MonthCalendar({
   year: number;
   month: number;
   openDateSet: Set<string>;
-  dates: Record<string, SlotInfo[]>;
+  dates: Record<string, DayAvailability>;
   selectedDate: string | null;
   onSelect: (date: string) => void;
 }) {
@@ -267,8 +399,10 @@ function MonthCalendar({
           if (!date) return <div key={idx} />;
           const day = Number(date.slice(-2));
           const isOpen = openDateSet.has(date);
-          const slots = dates[date] ?? [];
-          const allBooked = isOpen && slots.every((s) => s.booked);
+          const info = dates[date];
+          // 하루 상한에 도달했거나 남은 슬롯이 없으면 마감으로 보여준다.
+          const allBooked =
+            isOpen && (info.full || info.slots.every((s) => s.booked));
           const isSelected = date === selectedDate;
           const dow = weekdayOf(date);
 
@@ -327,12 +461,15 @@ function BookingForm({
   slot,
   onCancel,
   onBooked,
+  onDayFull,
 }: {
   token: string;
   slotDate: string;
   slot: SlotInfo;
   onCancel: () => void;
   onBooked: (info: DoneInfo) => void;
+  /** 폼을 채우는 사이 그 날짜가 하루 상한에 도달한 경우(BK003) */
+  onDayFull: (message: string) => void;
 }) {
   const [projectName, setProjectName] = useState("");
   const [companyName, setCompanyName] = useState("");
@@ -366,6 +503,12 @@ function BookingForm({
       });
       const data = await res.json();
       if (!res.ok) {
+        // BK003 = 하루 상한. 이 시간만의 문제가 아니라 그날 전체가 닫힌 것이므로
+        // 폼 안에 에러를 띄우지 않고 달력으로 돌려보낸다.
+        if (data.code === "BK003") {
+          onDayFull("해당 날짜가 방금 마감되었습니다. 다른 날짜를 선택해 주세요.");
+          return;
+        }
         setError(data.error ?? "예약에 실패했습니다.");
         return;
       }

@@ -4,16 +4,29 @@ import { getSupabaseAdmin } from "@/lib/supabase";
 import { requireBookingAccess } from "@/lib/booking/access";
 import {
   consultTypeForProject,
-  isOpenSlot,
   isValidProject,
   slotLabel,
   toDbTime,
 } from "@/lib/booking/config";
+import { dailyBookingLimit } from "@/lib/booking/slots";
 import { sendBookingNotification } from "@/lib/mail";
 
 export const dynamic = "force-dynamic";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const START_RE = /^\d{2}:\d{2}$/;
+
+/**
+ * create_booking(supabase/functions.sql) 이 SQLSTATE 로 돌려주는 실패 사유.
+ * 슬롯 중복과 하루 상한을 다른 문구로 보여줘야 해서 코드로 구분한다.
+ */
+const RPC_ERRORS: Record<string, { status: number; message: string }> = {
+  BK001: { status: 400, message: "예약할 수 없는 시간입니다." },
+  BK002: { status: 409, message: "이미 마감된 시간입니다." },
+  BK003: { status: 409, message: "해당 날짜는 예약이 마감되었습니다." },
+  BK004: { status: 409, message: "이미 예약된 내역이 있습니다." },
+};
 
 /** 예약 접수 */
 export async function POST(request: NextRequest) {
@@ -37,8 +50,8 @@ export async function POST(request: NextRequest) {
   const snsUrl = String(body.sns_url ?? "").trim() || null;
   const preQuestion = String(body.pre_question ?? "").trim() || null;
 
-  // 열어둔 슬롯인지 서버에서 검증 (임의의 날짜/시간 예약 차단)
-  if (!isOpenSlot(slotDate, start)) {
+  // 형식만 여기서 보고, "열어둔 슬롯인지"는 함수 안에서 잠금을 잡은 뒤 확인한다.
+  if (!DATE_RE.test(slotDate) || !START_RE.test(start)) {
     return Response.json(
       { error: "예약할 수 없는 시간입니다." },
       { status: 400 }
@@ -46,10 +59,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!isValidProject(projectName)) {
-    return Response.json(
-      { error: "사업명을 선택해 주세요." },
-      { status: 400 }
-    );
+    return Response.json({ error: "사업명을 선택해 주세요." }, { status: 400 });
   }
   if (!companyName || !contactName || !phone || !email) {
     return Response.json(
@@ -78,29 +88,33 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    // 슬롯 확인 → 하루 상한 확인 → insert 를 한 트랜잭션에서 처리한다.
+    // 함수 안에서 그 날짜를 advisory lock 으로 잠그므로,
+    // 동시에 들어온 요청이 상한을 넘겨 들어갈 수 없다.
     const { data, error } = await getSupabaseAdmin()
-      .from("bookings")
-      .insert({
-        slot_date: slotDate,
-        start_time: toDbTime(start),
-        project_name: projectName,
-        company_name: companyName,
-        contact_name: contactName,
-        phone,
-        email,
-        consult_type: consultType,
-        sns_url: snsUrl,
-        pre_question: preQuestion,
+      .rpc("create_booking", {
+        p_slot_date: slotDate,
+        p_start_time: toDbTime(start),
+        p_project_name: projectName,
+        p_company_name: companyName,
+        p_contact_name: contactName,
+        p_phone: phone,
+        p_email: email,
+        p_consult_type: consultType,
+        p_sns_url: snsUrl,
+        p_pre_question: preQuestion,
+        p_daily_limit: dailyBookingLimit(),
       })
-      .select("cancel_token")
-      .single();
+      .single<{ id: string; cancel_token: string }>();
 
     if (error) {
-      // 부분 유니크 인덱스 위반 = 이미 예약된 슬롯
-      if (error.code === "23505") {
+      const known = RPC_ERRORS[error.code ?? ""];
+      if (known) {
+        // code 를 같이 내려준다. 클라이언트가 문구를 비교하지 않고
+        // "하루 상한에 걸렸다"(BK003)를 구분해서 다르게 처리할 수 있게.
         return Response.json(
-          { error: "이미 마감된 시간입니다." },
-          { status: 409 }
+          { error: known.message, code: error.code },
+          { status: known.status }
         );
       }
       throw new Error(error.message);

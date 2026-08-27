@@ -103,3 +103,40 @@ alter table public.bookings enable row level security;
 -- 기존 bookings 테이블에 사업명 컬럼 추가 (여러 번 실행해도 안전).
 -- 새로 만드는 경우 위 create table 에 이미 포함되어 있다.
 alter table public.bookings add column if not exists project_name text;
+
+
+-- ---------------------------------------------------------------------------
+-- booking_slots : 예약 가능 슬롯(열어둔 날짜/시각)
+--   · 예전에는 코드(config.ts OPEN_SLOTS)에 하드코딩했지만, 관리자 화면에서
+--     텍스트를 붙여넣어 등록하도록 바뀌면서 DB 테이블로 옮겼다.
+--   · 시각은 Asia/Seoul 기준 "벽시계 시간", 1시간 단위(정각)만 허용.
+--   · (날짜, 시각)이 기본키라 중복 등록은 on conflict do nothing 으로 걸러진다.
+-- ---------------------------------------------------------------------------
+create table if not exists public.booking_slots (
+  slot_date  date        not null,
+  start_time time        not null,
+  created_at timestamptz not null default now(),
+
+  primary key (slot_date, start_time),
+
+  constraint booking_slots_start_time_hourly check (
+    extract(minute from start_time) = 0
+    and extract(second from start_time) = 0
+  )
+);
+
+create index if not exists booking_slots_slot_date_idx
+  on public.booking_slots (slot_date);
+
+alter table public.booking_slots enable row level security;
+
+
+-- 하루 예약 상한(DAILY_BOOKING_LIMIT) 계산용: 날짜별 유효 예약 수 조회
+create index if not exists bookings_active_slot_date_idx
+  on public.bookings (slot_date)
+  where cancelled_at is null;
+
+-- 같은 이메일의 중복 예약 차단용 (대소문자 무시)
+create index if not exists bookings_active_email_idx
+  on public.bookings (lower(email))
+  where cancelled_at is null;

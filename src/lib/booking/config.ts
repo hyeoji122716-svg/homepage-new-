@@ -1,15 +1,26 @@
 /**
- * 예약 노출/오픈 설정.
+ * 예약 공통 설정 (클라이언트/서버 양쪽에서 import 한다).
  *
- * 예약 가능한 날짜·시간은 여기에 하드코딩한다. (관리자 슬롯 생성 화면 없음)
+ * 예약 가능한 날짜·시간(슬롯)은 DB(booking_slots)에 있고 /connectu-admin/bookings
+ * 에서 등록한다. 여기에는 하드코딩하지 않는다.
+ *
  * 시간은 1시간 단위(정각)이고, 모든 값은 Asia/Seoul 기준 "벽시계 시간"이다.
+ *
+ * ⚠️ 이 파일은 클라이언트 번들에도 들어간다. process.env 를 읽지 말 것.
+ *    (하루 상한 등 서버 전용 설정은 lib/booking/slots.ts 에 둔다.)
  */
 
 function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-/** 달력에 보여줄 달 (2026년 9월, 10월). 기본 노출은 첫 번째(9월). */
+/** 슬롯 등록 시 고정으로 붙이는 연도. 붙여넣기 형식('9월 2일')에 연도가 없다. */
+export const SLOT_YEAR = 2026;
+
+/**
+ * 등록된 슬롯이 하나도 없을 때 달력에 보여줄 기본 달.
+ * 슬롯이 있으면 그 날짜들에서 달 목록을 만들어 쓴다.
+ */
 export const BOOKING_MONTHS: { year: number; month: number }[] = [
   { year: 2026, month: 9 },
   { year: 2026, month: 10 },
@@ -45,31 +56,6 @@ export function isFixed30Project(name: string): boolean {
  */
 export function consultTypeForProject(name: string): "60" | "30" {
   return isFixed30Project(name) ? "30" : "60";
-}
-
-/**
- * 하드코딩으로 열어둔 예약 가능 슬롯.
- * key: 'YYYY-MM-DD', value: 시작 시각('HH:MM', 정각) 배열.
- *
- * ⚠️ 지금은 시험용으로 9/1 세 칸만 열어둠. 여기 값만 바꾸면 달력에 바로 반영된다.
- */
-export const OPEN_SLOTS: Record<string, string[]> = {
-  "2026-09-01": ["01:00", "02:00", "03:00"],
-};
-
-/** 예약을 열어둔 날짜 목록 (슬롯이 하나 이상 있는 날) */
-export function openDates(): string[] {
-  return Object.keys(OPEN_SLOTS).filter((d) => OPEN_SLOTS[d]?.length > 0);
-}
-
-/** 해당 날짜의 열린 시작 시각 목록('HH:MM'). 없으면 빈 배열. */
-export function openStartsFor(date: string): string[] {
-  return OPEN_SLOTS[date] ?? [];
-}
-
-/** 그 (날짜, 시작시각)이 실제로 열어둔 슬롯인지 (서버 검증용) */
-export function isOpenSlot(date: string, start: string): boolean {
-  return openStartsFor(date).includes(start);
 }
 
 /** '01:00' → '02:00' (1시간 뒤) */
