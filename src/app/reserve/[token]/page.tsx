@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { bookingAccessToken } from "@/lib/booking/access";
+import { siteUrl } from "@/lib/site-url";
 import BookingCalendar from "@/components/booking/BookingCalendar";
 
 export const metadata: Metadata = {
@@ -25,5 +26,6 @@ export default async function ReservePage({
     notFound();
   }
 
-  return <BookingCalendar token={token} />;
+  // 완료 화면의 "예약 확인 주소"를 도메인까지 붙여 보여주기 위해 내려준다.
+  return <BookingCalendar token={token} baseUrl={await siteUrl()} />;
 }

@@ -69,6 +69,17 @@ export async function loadAvailability(): Promise<Availability> {
   const slots = await fetchOpenSlots();
   const dateList = [...new Set(slots.map((s) => s.slot_date))];
 
+  // 슬롯이 0건이면 달력에 고를 수 있는 날짜가 하나도 없다.
+  // 정말 미등록일 수도 있지만, DB 에 행이 있는데도 0건이면 연결/키 문제다.
+  if (slots.length === 0) {
+    console.warn(
+      "booking_slots 조회 결과가 0건입니다. " +
+        "슬롯을 등록하지 않았다면 정상이지만, DB 에 행이 있는데 0건이면 " +
+        "NEXT_PUBLIC_SUPABASE_URL 이 다른 프로젝트를 보고 있거나 " +
+        "SUPABASE_SERVICE_ROLE_KEY 가 service_role 키가 아닌 경우입니다."
+    );
+  }
+
   // 유효(취소 안 된) 예약만 가져와 슬롯 마감/하루 상한을 계산한다.
   const { data, error } = await getSupabaseAdmin()
     .from("bookings")

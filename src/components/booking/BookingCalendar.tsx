@@ -8,11 +8,7 @@ import {
   monthTitle,
   weekdayOf,
 } from "@/lib/booking/calendar";
-import {
-  formatDateWithWeekday,
-  formatMonthDay,
-  formatMonthDayWithWeekday,
-} from "@/lib/booking/format";
+import { formatDateWithWeekday, formatMonthDay } from "@/lib/booking/format";
 import { PROJECTS, consultTypeForProject } from "@/lib/booking/config";
 import type { Availability, DayAvailability, SlotInfo } from "@/lib/types";
 
@@ -26,7 +22,14 @@ type LoadState =
 
 type DoneInfo = { slot_date: string; time_label: string; cancel_token: string };
 
-export default function BookingCalendar({ token }: { token: string }) {
+export default function BookingCalendar({
+  token,
+  baseUrl,
+}: {
+  token: string;
+  /** 'https://example.com' (끝에 / 없음). 못 구하면 빈 문자열 — 이때는 경로만 보여준다. */
+  baseUrl: string;
+}) {
   const [state, setState] = useState<LoadState>({ kind: "loading" });
   const [monthIndex, setMonthIndex] = useState(0); // 0 = 첫 번째 달(기본 9월)
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -34,7 +37,7 @@ export default function BookingCalendar({ token }: { token: string }) {
   const [done, setDone] = useState<DoneInfo | null>(null);
   // 신청 도중 그 날짜가 마감된 경우 달력 위에 띄우는 안내
   const [notice, setNotice] = useState<string | null>(null);
-  const openDatesRef = useRef<HTMLDivElement | null>(null);
+  const calendarRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -69,6 +72,15 @@ export default function BookingCalendar({ token }: { token: string }) {
     return availability.dates[selectedDate] ?? null;
   }, [availability, selectedDate]);
 
+  /**
+   * 등록된 슬롯이 하나도 없는 경우.
+   *
+   * ⚠️ 이때 months 는 하드코딩 기본값(9·10월)으로 채워지기 때문에,
+   *    그냥 두면 "달력은 뜨는데 날짜가 전부 비활성" 으로 보여서
+   *    원인을 알 수 없다. 달력 대신 안내를 보여준다.
+   */
+  const hasSlots = !!availability && Object.keys(availability.dates).length > 0;
+
   const openDateSet = useMemo(() => {
     const s = new Set<string>();
     if (availability) {
@@ -77,15 +89,6 @@ export default function BookingCalendar({ token }: { token: string }) {
       }
     }
     return s;
-  }, [availability]);
-
-  /** 아직 고를 수 있는 날짜 (하루 상한에 걸리지 않았고 빈 슬롯이 있는 날) */
-  const openDates = useMemo(() => {
-    if (!availability) return [];
-    return Object.entries(availability.dates)
-      .filter(([, day]) => !day.full && day.slots.some((slot) => !slot.booked))
-      .map(([date]) => date)
-      .sort();
   }, [availability]);
 
   /** 날짜 선택 (다른 달의 날짜를 고르면 달력도 그 달로 넘긴다) */
@@ -107,7 +110,7 @@ export default function BookingCalendar({ token }: { token: string }) {
 
   /**
    * 신청 폼을 채우는 사이에 그 날짜가 하루 상한에 도달한 경우.
-   * 폼을 닫고 달력으로 돌아가서, 아직 고를 수 있는 날짜 목록으로 스크롤한다.
+   * 폼을 닫고 달력으로 돌아가서, 다른 날짜를 고를 수 있게 달력으로 스크롤한다.
    */
   function handleDayFull(message: string) {
     setActiveSlot(null);
@@ -115,10 +118,10 @@ export default function BookingCalendar({ token }: { token: string }) {
     load().then((result) => setState(result));
   }
 
-  // 안내가 새로 뜨면 예약 가능한 날짜 목록으로 데려간다.
+  // 안내가 새로 뜨면 달력으로 데려간다. (다른 날짜를 바로 고를 수 있게)
   useEffect(() => {
     if (!notice) return;
-    openDatesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    calendarRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [notice]);
 
   function handleBooked(info: DoneInfo) {
@@ -156,21 +159,7 @@ export default function BookingCalendar({ token }: { token: string }) {
 
           {/* 조회 전용 링크. 이 주소로 예약 내용을 다시 확인할 수 있다.
               변경·취소는 이 페이지에 안내된 담당자 연락처로 받는다. */}
-          <div className="mt-5 rounded-xl bg-gray-50 px-4 py-3.5 text-left">
-            <p className="text-sm font-semibold text-gray-600">
-              예약 확인 주소 (저장해 두세요)
-            </p>
-            <a
-              href={`/booking/${done.cancel_token}`}
-              className="mt-1.5 block break-all text-sm underline"
-              style={{ color: BRAND }}
-            >
-              {`/booking/${done.cancel_token}`}
-            </a>
-            <p className="mt-2 text-[13px] leading-relaxed text-gray-500">
-              예약 변경·취소는 이 페이지에 안내된 연락처로 알려주세요.
-            </p>
-          </div>
+          <CopyLinkBox url={`${baseUrl}/booking/${done.cancel_token}`} />
 
           <button
             onClick={() => {
@@ -215,7 +204,23 @@ export default function BookingCalendar({ token }: { token: string }) {
         </p>
       )}
 
-      {availability && (
+      {availability && !hasSlots && (
+        <div
+          className="rounded-2xl border p-8 text-center"
+          style={{ borderColor: "#e5e7eb", background: "#fafafa" }}
+        >
+          <p className="text-[15px] font-semibold text-gray-700">
+            아직 열린 예약 시간이 없습니다
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-gray-500">
+            예약 가능한 날짜가 등록되면 이 화면에서 바로 선택할 수 있습니다.
+            <br />
+            담당자에게 문의해 주세요.
+          </p>
+        </div>
+      )}
+
+      {availability && hasSlots && (
         <>
           <p className="mb-3 text-[15px] leading-relaxed text-gray-600">
             원하시는 <b style={{ color: BRAND }}>날짜</b>를 먼저 선택한 뒤, 시간대를
@@ -243,7 +248,7 @@ export default function BookingCalendar({ token }: { token: string }) {
             const safeIndex = Math.min(monthIndex, months.length - 1);
             const current = months[safeIndex];
             return (
-              <div>
+              <div ref={calendarRef}>
                 <div className="mb-3 flex items-center justify-between">
                   <ArrowButton
                     dir="prev"
@@ -276,35 +281,6 @@ export default function BookingCalendar({ token }: { token: string }) {
               </div>
             );
           })()}
-
-          {/* 아직 고를 수 있는 날짜. 신청 중 마감된 경우 여기로 스크롤한다. */}
-          <div ref={openDatesRef} className="mt-6">
-            <p className="mb-2 text-sm font-semibold text-gray-500">
-              예약 가능한 날짜
-            </p>
-            {openDates.length === 0 ? (
-              <p className="text-sm text-gray-500">
-                지금은 예약 가능한 날짜가 없습니다.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {openDates.map((date) => (
-                  <button
-                    key={date}
-                    onClick={() => selectDate(date)}
-                    className="rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors"
-                    style={
-                      date === selectedDate
-                        ? { borderColor: BRAND, background: BRAND, color: "white" }
-                        : { borderColor: BRAND, color: BRAND, background: "white" }
-                    }
-                  >
-                    {formatMonthDayWithWeekday(date)}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
 
           {selectedDate &&
             selectedDay &&
@@ -609,6 +585,67 @@ function BookingForm({
           {pending ? "접수 중…" : "예약 신청"}
         </button>
       </form>
+    </div>
+  );
+}
+
+/**
+ * 예약 확인 주소 + 복사 버튼.
+ *
+ * 도메인까지 붙은 전체 주소를 보여준다. 사용자가 이 주소를 복사해서
+ * 메모장·메신저에 붙여넣어야 하는데, 경로만 있으면 그대로는 못 연다.
+ */
+function CopyLinkBox({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // clipboard API 가 막힌 환경(비-https 등) 대비 폴백
+      const ta = document.createElement("textarea");
+      ta.value = url;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+      } finally {
+        document.body.removeChild(ta);
+      }
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="mt-5 rounded-xl bg-gray-50 px-4 py-3.5 text-left">
+      <p className="text-sm font-semibold text-gray-600">
+        예약 확인 주소 (저장해 두세요)
+      </p>
+      <a
+        href={url}
+        className="mt-1.5 block break-all text-sm underline"
+        style={{ color: BRAND }}
+      >
+        {url}
+      </a>
+      <button
+        type="button"
+        onClick={copy}
+        className="mt-2.5 rounded-lg border px-3 py-1.5 text-[13px] font-semibold transition-colors"
+        style={
+          copied
+            ? { borderColor: BRAND, background: BRAND, color: "white" }
+            : { borderColor: BRAND, color: BRAND, background: "white" }
+        }
+      >
+        {copied ? "복사됨 ✓" : "주소 복사"}
+      </button>
+      <p className="mt-2 text-[13px] leading-relaxed text-gray-500">
+        예약 변경·취소는 이 페이지에 안내된 연락처로 알려주세요.
+      </p>
     </div>
   );
 }
