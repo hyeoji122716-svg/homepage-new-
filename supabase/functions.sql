@@ -28,7 +28,18 @@
 --   BK002 : 그 슬롯은 이미 예약됨          → "이미 마감된 시간입니다"
 --   BK003 : 그 날짜의 하루 상한에 도달     → "해당 날짜는 예약이 마감되었습니다"
 --   BK004 : 같은 이메일의 유효 예약이 있음 → "이미 예약된 내역이 있습니다"
+--   BK005 : 리드타임(시작 N시간 전)을 넘김    → "시작 24시간 전까지만 가능합니다"
+--
+-- p_lead_hours : 컨설팅 시작 몇 시간 전까지 받을지. null 이면 검사하지 않는다.
+--   관리자가 전화 요청 등을 대신 넣을 때 null 로 호출해 규칙을 우회한다.
 -- ---------------------------------------------------------------------------
+
+-- ⚠️ 파라미터가 늘어나면 create or replace 가 "교체"가 아니라 "오버로드 추가"가
+--    된다. 예전 시그니처를 먼저 지워야 두 버전이 공존하지 않는다.
+drop function if exists public.create_booking(
+  date, time, text, text, text, text, text, text, text, text, integer
+);
+
 create or replace function public.create_booking(
   p_slot_date    date,
   p_start_time   time,
@@ -40,7 +51,8 @@ create or replace function public.create_booking(
   p_consult_type text,
   p_sns_url      text,
   p_pre_question text,
-  p_daily_limit  integer
+  p_daily_limit  integer,
+  p_lead_hours   integer default null
 )
 returns table (id uuid, cancel_token text)
 language plpgsql
@@ -68,7 +80,19 @@ begin
     raise exception 'slot not open' using errcode = 'BK001';
   end if;
 
-  -- ③ 같은 이메일로 이미 유효한 예약이 있는지 (대소문자 무시)
+  -- ③ 리드타임: 컨설팅 시작 N시간 전을 넘겼는지.
+  --    slot_date + start_time 은 KST 벽시계이므로 'Asia/Seoul' 로 절대시각을
+  --    만든 뒤 now() 와 비교한다. 서버 타임존이 UTC 여도 결과가 같다.
+  --    p_lead_hours 가 null 이면 관리자 예외 — 검사하지 않는다.
+  if p_lead_hours is not null then
+    if now() > ((p_slot_date + p_start_time) at time zone 'Asia/Seoul')
+               - make_interval(hours => p_lead_hours) then
+      raise exception 'past lead time (% hours)', p_lead_hours
+        using errcode = 'BK005';
+    end if;
+  end if;
+
+  -- ④ 같은 이메일로 이미 유효한 예약이 있는지 (대소문자 무시)
   if exists (
     select 1 from public.bookings b
     where b.cancelled_at is null
@@ -77,7 +101,7 @@ begin
     raise exception 'duplicate email' using errcode = 'BK004';
   end if;
 
-  -- ④ 그 슬롯이 이미 찼는지
+  -- ⑤ 그 슬롯이 이미 찼는지
   if exists (
     select 1 from public.bookings b
     where b.cancelled_at is null
@@ -87,7 +111,7 @@ begin
     raise exception 'slot taken' using errcode = 'BK002';
   end if;
 
-  -- ⑤ 하루 상한. 취소된 건은 세지 않으므로, 취소하면 자동으로 다시 열린다.
+  -- ⑥ 하루 상한. 취소된 건은 세지 않으므로, 취소하면 자동으로 다시 열린다.
   select count(*) into v_active
   from public.bookings b
   where b.cancelled_at is null
@@ -124,11 +148,11 @@ $$;
 -- 이 함수는 서버(service_role)에서만 호출한다.
 -- anon 키로 rpc 를 때려서 예약을 만들 수 없도록 실행 권한을 회수한다.
 revoke all on function public.create_booking(
-  date, time, text, text, text, text, text, text, text, text, integer
+  date, time, text, text, text, text, text, text, text, text, integer, integer
 ) from public;
 revoke all on function public.create_booking(
-  date, time, text, text, text, text, text, text, text, text, integer
+  date, time, text, text, text, text, text, text, text, text, integer, integer
 ) from anon, authenticated;
 grant execute on function public.create_booking(
-  date, time, text, text, text, text, text, text, text, text, integer
+  date, time, text, text, text, text, text, text, text, text, integer, integer
 ) to service_role;

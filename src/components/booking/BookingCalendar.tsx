@@ -232,6 +232,8 @@ export default function BookingCalendar({
             style={{ background: "#EAF0FF", color: BRAND }}
           >
             컨설팅 품질을 위해 하루 예약 건수를 제한하고 있습니다.
+            <br />
+            예약은 컨설팅 시작 {availability.leadTimeHours}시간 전까지 가능합니다.
           </p>
 
           {notice && (
@@ -284,8 +286,9 @@ export default function BookingCalendar({
 
           {selectedDate &&
             selectedDay &&
-            /* 하루 상한이 찬 날은 시간대를 하나씩 보여주지 않고 카드째 접는다. */
-            (selectedDay.full ? (
+            /* 하루 상한이 찼거나 그날 슬롯이 전부 마감 시각을 넘긴 날은
+               시간대를 하나씩 보여주지 않고 카드째 접는다. */
+            (selectedDay.full || selectedDay.closed ? (
               <div
                 className="mt-6 rounded-2xl border p-5 text-center"
                 style={{ borderColor: "#eee", background: "#fafafa" }}
@@ -317,22 +320,28 @@ export default function BookingCalendar({
                   </p>
                 ) : (
                   <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                    {selectedDay.slots.map((slot) => (
-                      <button
-                        key={slot.start}
-                        disabled={slot.booked}
-                        onClick={() => setActiveSlot(slot)}
-                        className="flex items-center justify-between rounded-xl border px-4 py-3 text-left text-[15px] transition-colors disabled:cursor-not-allowed"
-                        style={
-                          slot.booked
-                            ? { borderColor: "#eee", background: "#f6f6f6", color: "#aaa" }
-                            : { borderColor: BRAND, color: BRAND, background: "white" }
-                        }
-                      >
-                        <span className="font-semibold">{slot.label}</span>
-                        <span className="text-sm">{slot.booked ? "마감" : "예약"}</span>
-                      </button>
-                    ))}
+                    {selectedDay.slots.map((slot) => {
+                      // 예약이 차서 마감 / 시작 N시간 전을 넘겨 마감 — 문구를 구분한다.
+                      const unavailable = slot.booked || slot.closed;
+                      return (
+                        <button
+                          key={slot.start}
+                          disabled={unavailable}
+                          onClick={() => setActiveSlot(slot)}
+                          className="flex items-center justify-between rounded-xl border px-4 py-3 text-left text-[15px] transition-colors disabled:cursor-not-allowed"
+                          style={
+                            unavailable
+                              ? { borderColor: "#eee", background: "#f6f6f6", color: "#aaa" }
+                              : { borderColor: BRAND, color: BRAND, background: "white" }
+                          }
+                        >
+                          <span className="font-semibold">{slot.label}</span>
+                          <span className="text-sm">
+                            {slot.booked ? "마감" : slot.closed ? "예약 마감" : "예약"}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -376,9 +385,13 @@ function MonthCalendar({
           const day = Number(date.slice(-2));
           const isOpen = openDateSet.has(date);
           const info = dates[date];
-          // 하루 상한에 도달했거나 남은 슬롯이 없으면 마감으로 보여준다.
+          // 하루 상한에 도달했거나, 남은 슬롯이 없거나, 그날 전부 마감 시각을
+          // 넘겼으면 마감으로 보여준다.
           const allBooked =
-            isOpen && (info.full || info.slots.every((s) => s.booked));
+            isOpen &&
+            (info.full ||
+              info.closed ||
+              info.slots.every((s) => s.booked || s.closed));
           const isSelected = date === selectedDate;
           const dow = weekdayOf(date);
 
@@ -479,10 +492,14 @@ function BookingForm({
       });
       const data = await res.json();
       if (!res.ok) {
-        // BK003 = 하루 상한. 이 시간만의 문제가 아니라 그날 전체가 닫힌 것이므로
-        // 폼 안에 에러를 띄우지 않고 달력으로 돌려보낸다.
+        // BK003(하루 상한) / BK005(리드타임 초과) 는 이 시간만의 문제가 아니라
+        // 그날을 더 고를 수 없다는 뜻이므로, 폼 대신 달력으로 돌려보낸다.
         if (data.code === "BK003") {
           onDayFull("해당 날짜가 방금 마감되었습니다. 다른 날짜를 선택해 주세요.");
+          return;
+        }
+        if (data.code === "BK005") {
+          onDayFull(data.error ?? "예약 가능 시간이 지났습니다.");
           return;
         }
         setError(data.error ?? "예약에 실패했습니다.");

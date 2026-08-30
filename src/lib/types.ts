@@ -52,6 +52,7 @@ export interface SlotInfo {
   end: string; // 'HH:MM'
   label: string; // '10:00 ~ 11:00'
   booked: boolean; // 그 슬롯에 유효 예약이 있음
+  closed: boolean; // 리드타임(시작 N시간 전)을 넘겨 예약을 받지 않음
 }
 
 /** 어떤 날짜 하루의 예약 가능 상태. 저장하지 않고 조회 시점에 계산한다. */
@@ -59,12 +60,14 @@ export interface DayAvailability {
   booked: number; // 그날 유효 예약 수
   limit: number; // 하루 상한 (DAILY_BOOKING_LIMIT)
   full: boolean; // booked >= limit 이면 그날 남은 슬롯은 전부 예약 불가
+  closed: boolean; // 그날 슬롯이 전부 리드타임을 넘김
   slots: SlotInfo[];
 }
 
 export interface Availability {
   months: { year: number; month: number }[];
   limit: number;
+  leadTimeHours: number; // 컨설팅 시작 N시간 전까지만 예약 가능
   dates: Record<string, DayAvailability>; // key: 'YYYY-MM-DD'
 }
 
