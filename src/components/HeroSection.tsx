@@ -6,15 +6,8 @@ export default function HeroSection() {
       id="hero"
       className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gray-900"
     >
-      {/* 배경 이미지 플레이스홀더 */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-[#1a3300]/40">
-        <div className="absolute inset-0 flex items-center justify-center opacity-5">
-          <p className="text-white text-center text-sm px-8 leading-relaxed max-w-md">
-            [배경 이미지] 강연 현장 전경 사진 — 강사가 무대 위에서 발표하는 역동적인 장면,
-            또는 청중이 집중하는 대형 강연장 전경. 어두운 톤 오버레이 적용.
-          </p>
-        </div>
-      </div>
+      {/* 배경 그라데이션 */}
+      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-[#1a3300]/40" />
 
       {/* 오렌지 accent 라인 */}
       <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-[#b1ff57] to-transparent" />

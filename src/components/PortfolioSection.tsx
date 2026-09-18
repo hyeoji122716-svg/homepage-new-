@@ -98,21 +98,12 @@ export default function PortfolioSection() {
           ))}
         </div>
 
-        {/* 로고 그리드 플레이스홀더 */}
+        {/* 클라이언트 */}
         <div className="mb-16">
           <h3 className="text-2xl font-bold text-gray-900 mb-3">클라이언트</h3>
           <p className="text-gray-500 text-sm mb-8">
             강의 및 컨설팅을 진행한 주요 기업·기관입니다.
           </p>
-
-          {/* 로고 이미지 영역 */}
-          <div className="bg-gray-50 rounded-2xl p-8 mb-8 border border-dashed border-gray-300 text-center">
-            <p className="text-gray-400 text-sm leading-relaxed">
-              [클라이언트 로고 그리드]<br />
-              각 기업·기관의 공식 로고를 그레이스케일 처리하여 배치.<br />
-              마우스 오버 시 컬러 전환. 권장: 3열 × 4행 (12개 로고)
-            </p>
-          </div>
 
           {/* 텍스트 기반 클라이언트 목록 */}
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -134,7 +125,7 @@ export default function PortfolioSection() {
           </div>
         </div>
 
-        {/* 케이스 스터디 플레이스홀더 */}
+        {/* 주요 프로젝트 */}
         <div>
           <h3 className="text-2xl font-bold text-gray-900 mb-8">주요 프로젝트</h3>
           <div className="grid md:grid-cols-2 gap-6">
@@ -151,13 +142,6 @@ export default function PortfolioSection() {
               },
             ].map((proj) => (
               <div key={proj.title} className="bg-gray-50 rounded-2xl overflow-hidden group">
-                <div className="aspect-video bg-gray-200 flex flex-col items-center justify-center border-b border-dashed border-gray-300">
-                  <span className="text-3xl mb-2">🖼</span>
-                  <p className="text-gray-400 text-xs text-center px-6">
-                    [프로젝트 이미지]<br />
-                    강의 현장 또는 협업 결과물 사진
-                  </p>
-                </div>
                 <div className="p-6">
                   <p className="text-[#b1ff57] text-xs font-semibold mb-1">{proj.sub}</p>
                   <h4 className="text-lg font-bold text-gray-900 mb-2">{proj.title}</h4>

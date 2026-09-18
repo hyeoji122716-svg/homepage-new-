@@ -65,16 +65,6 @@ export default function AchievementsSection() {
           ))}
         </div>
 
-        {/* 강의 이력 이미지 플레이스홀더 */}
-        <div className="bg-white rounded-2xl p-8 mb-12 border border-dashed border-gray-300 text-center">
-          <div className="text-4xl mb-3">🏆</div>
-          <p className="text-gray-400 text-sm leading-relaxed max-w-md mx-auto">
-            [성과 이미지 / 수료증 갤러리]<br />
-            강의 현장 사진, 기관 수료증, 감사패, 협약 체결 사진 등을 그리드 형태로 배치.
-            최대 6~9장 권장.
-          </p>
-        </div>
-
         {/* 카테고리별 강의 이력 */}
         <h3 className="text-2xl font-bold text-gray-900 mb-8">주요 강의 이력</h3>
         <div className="grid md:grid-cols-3 gap-6">
@@ -93,26 +83,6 @@ export default function AchievementsSection() {
               </ul>
             </div>
           ))}
-        </div>
-
-        {/* 미디어 출연 / 영상 자료 플레이스홀더 */}
-        <div className="mt-16">
-          <h3 className="text-2xl font-bold text-gray-900 mb-8">강의 영상 · 미디어</h3>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="aspect-video bg-gray-200 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-gray-300"
-              >
-                <span className="text-3xl mb-2">▶</span>
-                <p className="text-gray-400 text-xs text-center px-4">
-                  [강의 영상 썸네일 {i}]<br />
-                  유튜브 임베드 또는 강의 영상 스크린샷.<br />
-                  클릭 시 재생 연결.
-                </p>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </section>

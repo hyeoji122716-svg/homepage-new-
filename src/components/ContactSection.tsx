@@ -106,15 +106,6 @@ export default function ContactSection() {
               ))}
             </div>
 
-            {/* SNS 이미지 플레이스홀더 */}
-            <div className="bg-gray-800 rounded-2xl p-6 border border-dashed border-gray-600">
-              <p className="text-gray-500 text-sm text-center leading-relaxed">
-                [SNS 피드 미리보기 또는 QR 코드]<br />
-                인스타그램 최신 피드 3~4장 또는<br />
-                카카오채널 / 오픈카톡 QR 코드 이미지
-              </p>
-            </div>
-
             {/* 강의 가능 지역 */}
             <div className="mt-8">
               <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">강의 가능 지역</h4>
