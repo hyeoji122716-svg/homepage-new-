@@ -21,6 +21,12 @@ const contactItems = [
     value: "blog.naver.com/connectu_team",
     href: "https://blog.naver.com/connectu_team",
   },
+  {
+    icon: "📸",
+    label: "인스타그램",
+    value: "@namm.gumi",
+    href: "https://www.instagram.com/namm.gumi",
+  },
 ];
 
 export default function ContactSection() {
