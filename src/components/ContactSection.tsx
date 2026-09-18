@@ -6,26 +6,20 @@ const contactItems = [
   {
     icon: "✉️",
     label: "이메일",
-    value: "문의 이메일을 입력해주세요",
+    value: "connectu_team@naver.com",
     href: null,
   },
   {
     icon: "📞",
     label: "전화",
-    value: "010-0000-0000",
+    value: "010-3207-5251",
     href: null,
   },
   {
-    icon: "📸",
-    label: "인스타그램",
-    value: "@connectu_official",
-    href: null,
-  },
-  {
-    icon: "▶",
-    label: "유튜브",
-    value: "커넥트유 채널",
-    href: null,
+    icon: "📝",
+    label: "블로그",
+    value: "blog.naver.com/connectu_team",
+    href: "https://blog.naver.com/connectu_team",
   },
 ];
 
@@ -95,7 +89,18 @@ export default function ContactSection() {
                   </div>
                   <div>
                     <div className="text-gray-400 text-xs mb-0.5">{item.label}</div>
-                    <div className="text-white font-medium">{item.value}</div>
+                    {item.href ? (
+                      <a
+                        href={item.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-white font-medium hover:text-[#b1ff57] transition-colors"
+                      >
+                        {item.value}
+                      </a>
+                    ) : (
+                      <div className="text-white font-medium">{item.value}</div>
+                    )}
                   </div>
                 </div>
               ))}
